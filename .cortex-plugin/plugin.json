@@ -1,0 +1,12 @@
+{
+  "name": "metatate",
+  "description": "Use Metatate structured context and policy decisions from Cortex Code through Snowflake-managed MCP.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Metatate",
+    "url": "https://metatate.ai"
+  },
+  "commands": "./commands",
+  "skills": "./skills",
+  "agents": "./agents"
+}

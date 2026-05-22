@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+name="metatate"
+account_url=""
+app_name="METATATE_APP"
+schema_name="CORE"
+server_name="METATATE_MCP"
+client_id=""
+client_name="Metatate Cortex Code"
+redirect_port="8585"
+authorization_server_url=""
+oauth_scopes=""
+config_file="${HOME}/.snowflake/cortex/mcp.json"
+write_config="false"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  metatate-cortex-mcp-add --account-url https://<account-url> --client-id <client-id> [options]
+
+Options:
+  --name <name>                    Cortex MCP server name. Default: metatate
+  --account-url <url>              Snowflake account URL, for example https://org-account.snowflakecomputing.com
+  --app <app>                      Snowflake application database. Default: METATATE_APP
+  --schema <schema>                MCP server schema. Default: CORE
+  --server <server>                MCP server name. Default: METATATE_MCP
+  --client-id <client-id>          Snowflake OAuth client ID
+  --client-name <client-name>      OAuth client name shown by Cortex Code. Default: Metatate Cortex Code
+  --redirect-port <port>           OAuth loopback redirect port. Default: 8585
+  --authorization-server-url <url> Optional OAuth authorization server base URL
+  --snowflake-role <role>          Pin OAuth to a Snowflake role via session:role:<ROLE>
+  --oauth-scopes <scopes>          Pin raw OAuth scopes. Overrides --snowflake-role
+  --config-file <path>             Cortex MCP config path. Default: ~/.snowflake/cortex/mcp.json
+  --write                          Merge the server into the Cortex MCP config file
+  --dry-run                        Print the server JSON without writing. Default behavior
+  -h, --help                       Show this help
+
+The generated Cortex MCP config does not include a client secret.
+
+For Snowflake OAuth, prefer --snowflake-role so Cortex Code requests the
+intended session role instead of relying on the user's default role or secondary
+roles.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --name)
+      name="${2:?missing value for --name}"
+      shift 2
+      ;;
+    --account-url)
+      account_url="${2:?missing value for --account-url}"
+      shift 2
+      ;;
+    --app)
+      app_name="${2:?missing value for --app}"
+      shift 2
+      ;;
+    --schema)
+      schema_name="${2:?missing value for --schema}"
+      shift 2
+      ;;
+    --server)
+      server_name="${2:?missing value for --server}"
+      shift 2
+      ;;
+    --client-id)
+      client_id="${2:?missing value for --client-id}"
+      shift 2
+      ;;
+    --client-name)
+      client_name="${2:?missing value for --client-name}"
+      shift 2
+      ;;
+    --redirect-port)
+      redirect_port="${2:?missing value for --redirect-port}"
+      shift 2
+      ;;
+    --authorization-server-url)
+      authorization_server_url="${2:?missing value for --authorization-server-url}"
+      shift 2
+      ;;
+    --snowflake-role)
+      oauth_scopes="session:role:${2:?missing value for --snowflake-role}"
+      shift 2
+      ;;
+    --oauth-scopes)
+      oauth_scopes="${2:?missing value for --oauth-scopes}"
+      shift 2
+      ;;
+    --config-file)
+      config_file="${2:?missing value for --config-file}"
+      shift 2
+      ;;
+    --write)
+      write_config="true"
+      shift
+      ;;
+    --dry-run)
+      write_config="false"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${account_url}" || -z "${client_id}" ]]; then
+  usage >&2
+  exit 2
+fi
+
+if [[ -z "${oauth_scopes}" ]]; then
+  echo "Missing --snowflake-role or --oauth-scopes." >&2
+  echo "Use --snowflake-role <ROLE> so the OAuth token is pinned to the intended Snowflake role." >&2
+  exit 2
+fi
+
+account_url="${account_url%/}"
+endpoint="${account_url}/api/v2/databases/${app_name}/schemas/${schema_name}/mcp-servers/${server_name}"
+
+server_json="$(
+  ENDPOINT="${endpoint}" \
+  CLIENT_ID="${client_id}" \
+  CLIENT_NAME="${client_name}" \
+  REDIRECT_PORT="${redirect_port}" \
+  OAUTH_SCOPES="${oauth_scopes}" \
+  AUTHORIZATION_SERVER_URL="${authorization_server_url}" \
+  python3 -c 'import json, os
+oauth = {
+    "client_id": os.environ["CLIENT_ID"],
+    "client_name": os.environ["CLIENT_NAME"],
+    "redirect_port": int(os.environ["REDIRECT_PORT"]),
+    "scope": os.environ["OAUTH_SCOPES"],
+}
+authorization_server_url = os.environ.get("AUTHORIZATION_SERVER_URL", "")
+if authorization_server_url:
+    oauth["authorization_server_url"] = authorization_server_url.rstrip("/")
+print(json.dumps({
+    "type": "http",
+    "url": os.environ["ENDPOINT"],
+    "oauth": oauth,
+}, indent=2, sort_keys=True))'
+)"
+
+if [[ "${write_config}" != "true" ]]; then
+  printf '%s\n' "${server_json}"
+  exit 0
+fi
+
+CONFIG_FILE="${config_file}" \
+SERVER_NAME="${name}" \
+SERVER_JSON="${server_json}" \
+python3 -c 'import json, os, pathlib, tempfile
+config_path = pathlib.Path(os.environ["CONFIG_FILE"]).expanduser()
+server_name = os.environ["SERVER_NAME"]
+server = json.loads(os.environ["SERVER_JSON"])
+config_path.parent.mkdir(parents=True, exist_ok=True)
+
+if config_path.exists() and config_path.stat().st_size > 0:
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = json.load(handle)
+else:
+    config = {}
+
+if not isinstance(config, dict):
+    raise SystemExit(f"{config_path} must contain a JSON object")
+
+mcp_servers = config.setdefault("mcpServers", {})
+if not isinstance(mcp_servers, dict):
+    raise SystemExit(f"{config_path} has invalid mcpServers; expected a JSON object")
+
+mcp_servers[server_name] = server
+
+with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(config_path.parent), delete=False) as handle:
+    json.dump(config, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+    temp_name = handle.name
+
+pathlib.Path(temp_name).replace(config_path)
+'
+
+printf 'Wrote Cortex MCP server "%s" to %s\n' "${name}" "${config_file}"
+printf 'Run "cortex mcp start" to authenticate and connect.\n'
