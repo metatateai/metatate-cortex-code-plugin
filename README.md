@@ -15,6 +15,19 @@ authorization decisions, explanations, and audit evidence. This plugin does not
 run a Metatate-hosted MCP gateway and it does not store Snowflake credentials in
 the plugin repository.
 
+## See It In Action
+
+A developer is about to pull customer features for a churn model. The plugin
+catches the AI governance restriction on the source table, surfaces the
+sensitive columns, and suggests a safer rewrite against the PII-stripped
+feature view &mdash; before the query ever runs.
+
+![Cortex Code calling metatate:validate-query-context — verdict NOT COMPLIANT, suggested rewrite returned](docs/demo.svg)
+
+Try the live, interactive version at
+[getmetatate.com/snowflake](https://www.getmetatate.com/snowflake) (Cortex Code
+plugin section).
+
 ## What You Get
 
 - Cortex Code slash commands for governed data workflows: discover governed
@@ -45,6 +58,7 @@ metatate-cortex-code-plugin/
     cortex-code-install.md
     snowflake-admin-setup.md
     troubleshooting.md
+    demo.svg
   examples/
     prompts.md
   scripts/
