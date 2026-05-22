@@ -6,6 +6,9 @@ account_url=""
 app_name="METATATE_APP"
 schema_name="CORE"
 server_name="METATATE_MCP"
+auth_mode="pat"
+snowflake_role=""
+pat_token_env="METATATE_CORTEX_PAT"
 client_id=""
 client_name="Metatate Cortex Code"
 redirect_port="8585"
@@ -17,7 +20,8 @@ write_config="false"
 usage() {
   cat <<'EOF'
 Usage:
-  metatate-cortex-mcp-add --account-url https://<account-url> --client-id <client-id> [options]
+  metatate-cortex-mcp-add --account-url https://<account-url> --snowflake-role <role> [options]
+  metatate-cortex-mcp-add --auth oauth --account-url https://<account-url> --client-id <client-id> --snowflake-role <role> [options]
 
 Options:
   --name <name>                    Cortex MCP server name. Default: metatate
@@ -25,22 +29,24 @@ Options:
   --app <app>                      Snowflake application database. Default: METATATE_APP
   --schema <schema>                MCP server schema. Default: CORE
   --server <server>                MCP server name. Default: METATATE_MCP
-  --client-id <client-id>          Snowflake OAuth client ID
+  --auth <pat|oauth>               Authentication mode. Default: pat
+  --snowflake-role <role>          Snowflake role used for MCP calls
+  --pat-token-env <env-var>        Env var containing the Snowflake PAT. Default: METATATE_CORTEX_PAT
+  --client-id <client-id>          Snowflake OAuth client ID. Required only with --auth oauth
   --client-name <client-name>      OAuth client name shown by Cortex Code. Default: Metatate Cortex Code
   --redirect-port <port>           OAuth loopback redirect port. Default: 8585
   --authorization-server-url <url> Optional OAuth authorization server base URL
-  --snowflake-role <role>          Pin OAuth to a Snowflake role via session:role:<ROLE>
-  --oauth-scopes <scopes>          Pin raw OAuth scopes. Overrides --snowflake-role
+  --oauth-scopes <scopes>          Raw OAuth scopes. Overrides --snowflake-role in OAuth mode
   --config-file <path>             Cortex MCP config path. Default: ~/.snowflake/cortex/mcp.json
   --write                          Merge the server into the Cortex MCP config file
   --dry-run                        Print the server JSON without writing. Default behavior
   -h, --help                       Show this help
 
-The generated Cortex MCP config does not include a client secret.
+The default PAT mode writes an Authorization header that references an
+environment variable. It does not write the PAT secret into mcp.json.
 
-For Snowflake OAuth, prefer --snowflake-role so Cortex Code requests the
-intended session role instead of relying on the user's default role or secondary
-roles.
+OAuth mode is available for environments where the Snowflake-managed MCP
+protected-resource metadata allows the role-specific scope you need.
 EOF
 }
 
@@ -66,6 +72,19 @@ while [[ $# -gt 0 ]]; do
       server_name="${2:?missing value for --server}"
       shift 2
       ;;
+    --auth)
+      auth_mode="${2:?missing value for --auth}"
+      shift 2
+      ;;
+    --snowflake-role)
+      snowflake_role="${2:?missing value for --snowflake-role}"
+      oauth_scopes="session:role:${snowflake_role}"
+      shift 2
+      ;;
+    --pat-token-env)
+      pat_token_env="${2:?missing value for --pat-token-env}"
+      shift 2
+      ;;
     --client-id)
       client_id="${2:?missing value for --client-id}"
       shift 2
@@ -80,10 +99,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --authorization-server-url)
       authorization_server_url="${2:?missing value for --authorization-server-url}"
-      shift 2
-      ;;
-    --snowflake-role)
-      oauth_scopes="session:role:${2:?missing value for --snowflake-role}"
       shift 2
       ;;
     --oauth-scopes)
@@ -114,28 +129,58 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${account_url}" || -z "${client_id}" ]]; then
+if [[ -z "${account_url}" ]]; then
   usage >&2
-  exit 2
-fi
-
-if [[ -z "${oauth_scopes}" ]]; then
-  echo "Missing --snowflake-role or --oauth-scopes." >&2
-  echo "Use --snowflake-role <ROLE> so the OAuth token is pinned to the intended Snowflake role." >&2
   exit 2
 fi
 
 account_url="${account_url%/}"
 endpoint="${account_url}/api/v2/databases/${app_name}/schemas/${schema_name}/mcp-servers/${server_name}"
 
-server_json="$(
-  ENDPOINT="${endpoint}" \
-  CLIENT_ID="${client_id}" \
-  CLIENT_NAME="${client_name}" \
-  REDIRECT_PORT="${redirect_port}" \
-  OAUTH_SCOPES="${oauth_scopes}" \
-  AUTHORIZATION_SERVER_URL="${authorization_server_url}" \
-  python3 -c 'import json, os
+case "${auth_mode}" in
+  pat)
+    if [[ -z "${snowflake_role}" ]]; then
+      echo "Missing --snowflake-role for PAT mode." >&2
+      exit 2
+    fi
+    if [[ ! "${pat_token_env}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo "--pat-token-env must be a valid environment variable name." >&2
+      exit 2
+    fi
+    server_json="$(
+      ENDPOINT="${endpoint}" \
+      SNOWFLAKE_ROLE="${snowflake_role}" \
+      PAT_TOKEN_ENV="${pat_token_env}" \
+      python3 -c 'import json, os
+pat_ref = "${" + os.environ["PAT_TOKEN_ENV"] + "}"
+print(json.dumps({
+    "type": "http",
+    "url": os.environ["ENDPOINT"],
+    "headers": {
+        "Authorization": "Bearer " + pat_ref,
+        "X-Snowflake-Authorization-Token-Type": "PROGRAMMATIC_ACCESS_TOKEN",
+        "X-Snowflake-Role": os.environ["SNOWFLAKE_ROLE"],
+    },
+}, indent=2, sort_keys=True))'
+    )"
+    ;;
+  oauth)
+    if [[ -z "${client_id}" ]]; then
+      echo "Missing --client-id for OAuth mode." >&2
+      exit 2
+    fi
+    if [[ -z "${oauth_scopes}" ]]; then
+      echo "Missing --snowflake-role or --oauth-scopes for OAuth mode." >&2
+      exit 2
+    fi
+    server_json="$(
+      ENDPOINT="${endpoint}" \
+      CLIENT_ID="${client_id}" \
+      CLIENT_NAME="${client_name}" \
+      REDIRECT_PORT="${redirect_port}" \
+      OAUTH_SCOPES="${oauth_scopes}" \
+      AUTHORIZATION_SERVER_URL="${authorization_server_url}" \
+      python3 -c 'import json, os
 oauth = {
     "client_id": os.environ["CLIENT_ID"],
     "client_name": os.environ["CLIENT_NAME"],
@@ -150,7 +195,13 @@ print(json.dumps({
     "url": os.environ["ENDPOINT"],
     "oauth": oauth,
 }, indent=2, sort_keys=True))'
-)"
+    )"
+    ;;
+  *)
+    echo "--auth must be either 'pat' or 'oauth'." >&2
+    exit 2
+    ;;
+esac
 
 if [[ "${write_config}" != "true" ]]; then
   printf '%s\n' "${server_json}"
@@ -190,4 +241,8 @@ pathlib.Path(temp_name).replace(config_path)
 '
 
 printf 'Wrote Cortex MCP server "%s" to %s\n' "${name}" "${config_file}"
-printf 'Run "cortex mcp start" to authenticate and connect.\n'
+if [[ "${auth_mode}" == "pat" ]]; then
+  printf 'Export %s before running Cortex Code or "cortex mcp start".\n' "${pat_token_env}"
+else
+  printf 'Run "cortex mcp start" to authenticate and connect.\n'
+fi

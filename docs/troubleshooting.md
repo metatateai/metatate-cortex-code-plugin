@@ -10,8 +10,9 @@ The role ALL requested has been explicitly blocked for use with this application
 
 Cause:
 
-Snowflake received an OAuth request for the user's default role or secondary
-role `ALL` instead of the role intended for Metatate.
+The MCP connection is using OAuth and Cortex Code requested
+`scope=session:role:all` from Snowflake-managed MCP metadata instead of using a
+role-restricted PAT.
 
 Fix:
 
@@ -21,24 +22,42 @@ Fix:
    cortex mcp remove metatate
    ```
 
-2. Register again with an explicit Snowflake role scope.
+2. Ask your Snowflake administrator for a PAT restricted to the Metatate Cortex
+   Code role.
+
+3. Export the PAT.
+
+   ```bash
+   export METATATE_CORTEX_PAT='<snowflake-pat-secret>'
+   ```
+
+4. Register again with PAT mode, which is the default.
 
    ```bash
    ./bin/metatate-cortex-mcp-add \
      --account-url https://<account-url> \
-     --client-id <snowflake-oauth-client-id> \
      --snowflake-role <snowflake-role> \
      --write
    ```
 
-3. Ask your Snowflake administrator to confirm the same role is allowed and
-   preauthorized on the OAuth security integration.
-
-Users should not need to change their default Snowflake role to fix this.
+Users should not need to change their default Snowflake role or secondary roles
+to fix this.
 
 ## Browser Login Fails With Redirect URI Mismatch
 
-Check:
+This only applies if you are intentionally testing OAuth mode.
+
+For normal Cortex Code setup, remove the OAuth registration and use PAT mode:
+
+```bash
+cortex mcp remove metatate
+./bin/metatate-cortex-mcp-add \
+  --account-url https://<account-url> \
+  --snowflake-role <snowflake-role> \
+  --write
+```
+
+For OAuth mode, check:
 
 - The redirect URI in Snowflake matches the loopback URI used by Cortex Code.
 - The helper's `--redirect-port` value matches the port in the Snowflake
@@ -85,6 +104,10 @@ Expected tools:
 - `validate-query-context`
 - `explain-why`
 
+If `cortex mcp start` reports an authentication failure, verify that
+`METATATE_CORTEX_PAT` is exported in the same shell and that the PAT is
+restricted to the role configured in `X-Snowflake-Role`.
+
 ## Plugin Installed But Slash Commands Are Missing
 
 Check:
@@ -111,7 +134,8 @@ Then restart Cortex Code or run:
 
 Plugin-declared MCP servers are skipped when an administrator disables user MCP
 servers. This plugin does not declare a hardcoded MCP server because the
-Snowflake account URL, OAuth client ID, and role are customer-specific.
+Snowflake account URL, PAT environment variable, app object names, and role are
+customer-specific.
 
 Ask your administrator whether user MCP servers are allowed for your Cortex
 Code environment. If they are disabled, the MCP server should be provided by a

@@ -1,14 +1,15 @@
 # Cortex Code Install Guide
 
-This guide is for users after a Snowflake administrator has created the
-Metatate OAuth integration.
+This guide is for users after a Snowflake administrator has prepared Metatate
+MCP access and issued a role-restricted Snowflake programmatic access token
+(PAT).
 
 ## Values You Need
 
 Ask your administrator for:
 
 - Snowflake account URL.
-- OAuth client ID.
+- PAT secret restricted to the Metatate Cortex Code role.
 - Snowflake role to use with Metatate.
 - App database, schema, and MCP server name if they differ from
   `METATATE_APP.CORE.METATATE_MCP`.
@@ -59,12 +60,17 @@ git clone https://github.com/metatateai/metatate-cortex-code-plugin.git
 cd metatate-cortex-code-plugin
 ```
 
+Export the PAT in the same shell where you run Cortex Code:
+
+```bash
+export METATATE_CORTEX_PAT='<snowflake-pat-secret>'
+```
+
 Register the MCP server:
 
 ```bash
 ./bin/metatate-cortex-mcp-add \
   --account-url https://<account-url> \
-  --client-id <snowflake-oauth-client-id> \
   --snowflake-role <snowflake-role> \
   --write
 ```
@@ -77,7 +83,6 @@ To preview the config without writing it:
 ```bash
 ./bin/metatate-cortex-mcp-add \
   --account-url https://<account-url> \
-  --client-id <snowflake-oauth-client-id> \
   --snowflake-role <snowflake-role>
 ```
 
@@ -89,8 +94,8 @@ Start the MCP connection:
 cortex mcp start
 ```
 
-Your browser should open a Snowflake OAuth page. After login, return to the
-terminal and confirm the server is connected:
+Cortex Code should connect without opening a Snowflake OAuth page. Confirm the
+server is connected:
 
 ```bash
 cortex mcp list

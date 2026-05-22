@@ -65,14 +65,14 @@ For the Snowflake administrator:
   `METATATE_APP.CORE.METATATE_MCP`.
 - A Snowflake role for Cortex Code users. Use a least-privilege role that is
   allowed to use Metatate, not an account administration role.
-- Privilege to create or manage a Snowflake OAuth security integration.
+- A role-restricted Snowflake programmatic access token (PAT) policy for Cortex
+  Code users.
 
 For each Cortex Code user:
 
 - Cortex Code CLI installed and connected to Snowflake.
 - Access to the target Snowflake account in a role authorized for Metatate.
-- A Snowflake OAuth client ID from the administrator.
-- The Snowflake role to request through OAuth, for example
+- A Snowflake PAT restricted to the Metatate Cortex Code role, for example
   `METATATE_CORTEX_USER`.
 
 ## Install The Plugin
@@ -116,15 +116,14 @@ from your Snowflake administrator:
 ```bash
 ./bin/metatate-cortex-mcp-add \
   --account-url https://<account-url> \
-  --client-id <snowflake-oauth-client-id> \
   --snowflake-role <snowflake-role> \
   --write
 ```
 
 The helper writes a user-level Cortex MCP entry to
-`~/.snowflake/cortex/mcp.json`. It does not write a client secret. For the
-Cortex Code local OAuth flow, use the Snowflake OAuth setup in
-[docs/snowflake-admin-setup.md](docs/snowflake-admin-setup.md).
+`~/.snowflake/cortex/mcp.json`. It references the PAT through the
+`METATATE_CORTEX_PAT` environment variable and does not write the token secret
+to the config file.
 
 The generated server entry is equivalent to:
 
@@ -134,22 +133,27 @@ The generated server entry is equivalent to:
     "metatate": {
       "type": "http",
       "url": "https://<account-url>/api/v2/databases/METATATE_APP/schemas/CORE/mcp-servers/METATATE_MCP",
-      "oauth": {
-        "client_id": "<snowflake-oauth-client-id>",
-        "client_name": "Metatate Cortex Code",
-        "redirect_port": 8585,
-        "scope": "session:role:<snowflake-role>"
+      "headers": {
+        "Authorization": "Bearer ${METATATE_CORTEX_PAT}",
+        "X-Snowflake-Authorization-Token-Type": "PROGRAMMATIC_ACCESS_TOKEN",
+        "X-Snowflake-Role": "<snowflake-role>"
       }
     }
   }
 }
 ```
 
-The `session:role:<snowflake-role>` scope is required. It makes Snowflake issue
-the OAuth session for the intended Metatate role instead of falling back to the
-user's default role or secondary role `ALL`.
+The PAT should be restricted to the same role used in `X-Snowflake-Role`. This
+keeps MCP calls explicit, isolated, and auditable without relying on the user's
+default role or secondary roles.
 
 ## Authenticate
+
+Export the role-restricted PAT in the same shell where you run Cortex Code:
+
+```bash
+export METATATE_CORTEX_PAT='<snowflake-pat-secret>'
+```
 
 Start the MCP connection:
 
@@ -157,8 +161,8 @@ Start the MCP connection:
 cortex mcp start
 ```
 
-Cortex Code should open a browser for Snowflake OAuth authentication. After
-login, return to the terminal and confirm the `metatate` server is connected:
+Cortex Code should connect without opening a Snowflake OAuth browser flow.
+Confirm the `metatate` server is connected:
 
 ```bash
 cortex mcp list
@@ -244,6 +248,6 @@ The Snowflake-managed MCP server should expose these tools:
 
 ## Security
 
-Do not commit OAuth client secrets, access tokens, refresh tokens, generated
-MCP credential stores, screenshots of consent pages, or customer data. See
+Do not commit PATs, OAuth client secrets, access tokens, refresh tokens,
+generated MCP credential stores, screenshots of consent pages, or customer data. See
 [SECURITY.md](SECURITY.md).

@@ -1,7 +1,12 @@
 # Snowflake Administrator Setup
 
 This guide prepares a Snowflake account so Cortex Code can reach the Metatate
-Snowflake-managed MCP server through Snowflake OAuth.
+Snowflake-managed MCP server.
+
+Use a Snowflake programmatic access token (PAT) restricted to the Metatate
+Cortex Code role. This avoids the Cortex Code OAuth `session:role:all` behavior
+seen with Snowflake-managed MCP protected-resource metadata and keeps each MCP
+request pinned to the intended Snowflake role with `X-Snowflake-Role`.
 
 ## 1. Confirm The Metatate MCP Server Exists
 
@@ -47,92 +52,63 @@ Also grant the Metatate Native App privileges required by your Metatate
 deployment to this role. The exact grants depend on how your application
 package was installed and configured.
 
-## 3. Create The OAuth Security Integration
+## 3. Create A Role-Restricted PAT
 
-Cortex Code's MCP OAuth configuration is local to the developer workstation and
-does not store a client secret in the plugin repository. For this local CLI
-flow, use a Snowflake OAuth public client with PKCE enforced.
+Use either Snowsight or SQL to create a PAT for each user. The PAT must be
+restricted to the same role that users will configure in Cortex Code.
 
-Use a Snowflake role that can create security integrations.
+Example SQL:
 
 ```sql
 USE ROLE ACCOUNTADMIN;
 
-CREATE SECURITY INTEGRATION METATATE_CORTEX_CODE_OAUTH
-  TYPE = OAUTH
-  OAUTH_CLIENT = CUSTOM
-  ENABLED = TRUE
-  OAUTH_CLIENT_TYPE = 'PUBLIC'
-  OAUTH_REDIRECT_URI = 'http://127.0.0.1:8585/'
-  OAUTH_ALLOW_NON_TLS_REDIRECT_URI = TRUE
-  OAUTH_ENFORCE_PKCE = TRUE
-  OAUTH_ISSUE_REFRESH_TOKENS = TRUE;
+ALTER USER <snowflake_user>
+  ADD PROGRAMMATIC ACCESS TOKEN metatate_cortex_code
+  ROLE_RESTRICTION = 'METATATE_CORTEX_USER'
+  DAYS_TO_EXPIRY = 30
+  COMMENT = 'Metatate Cortex Code MCP token';
 ```
 
-If your Cortex Code version uses a different local OAuth callback URI, alter
-the integration to match the exact loopback URI emitted during the first OAuth
-attempt. Keep the port aligned with the plugin helper's `--redirect-port`
-value.
-
-Then restrict the OAuth integration to the role users should request from
-Cortex Code:
-
-```sql
-ALTER SECURITY INTEGRATION METATATE_CORTEX_CODE_OAUTH
-  SET ALLOWED_ROLES_LIST = ('METATATE_CORTEX_USER')
-      PRE_AUTHORIZED_ROLES_LIST = ('METATATE_CORTEX_USER');
-```
-
-The Cortex MCP registration must request the matching OAuth scope:
-
-```text
-session:role:METATATE_CORTEX_USER
-```
-
-This prevents Snowflake from attempting to authorize the user's default role or
-secondary role `ALL`.
-
-## 4. Delegate Authorization For Users
-
-For each Snowflake user who will authenticate from Cortex Code:
+If the user is not covered by a network policy and your account requires one
+for PAT use, add a temporary bypass while you complete the test:
 
 ```sql
 ALTER USER <snowflake_user>
-  ADD DELEGATED AUTHORIZATION OF ROLE METATATE_CORTEX_USER
-  TO SECURITY INTEGRATION METATATE_CORTEX_CODE_OAUTH;
+  ADD PROGRAMMATIC ACCESS TOKEN metatate_cortex_code
+  ROLE_RESTRICTION = 'METATATE_CORTEX_USER'
+  DAYS_TO_EXPIRY = 30
+  MINS_TO_BYPASS_NETWORK_POLICY_REQUIREMENT = 240
+  COMMENT = 'Metatate Cortex Code MCP token';
 ```
 
-If your Snowflake account policy relies only on preauthorized roles, this may
-not be necessary for every account. It is still a clear rollout pattern for a
-controlled user allowlist.
+Snowflake prints the PAT secret once in the `token_secret` column. Give that
+secret only to the token owner through your approved secret handoff process.
+Do not put PATs in GitHub, Slack history, README files, screenshots, or issue
+trackers.
 
-## 5. Retrieve OAuth Client Values
+## 4. Give Users The Setup Values
 
-Fetch the OAuth client values:
-
-```sql
-SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('METATATE_CORTEX_CODE_OAUTH');
-```
-
-Give users:
+Give each user:
 
 - Snowflake account URL, for example `https://<account>.snowflakecomputing.com`.
-- OAuth client ID.
+- PAT secret restricted to the Metatate Cortex Code role.
 - Snowflake role, for example `METATATE_CORTEX_USER`.
 - App database, schema, and server name if they differ from
   `METATATE_APP.CORE.METATATE_MCP`.
 
-Do not put OAuth secrets, access tokens, refresh tokens, screenshots, or
-customer data in GitHub, Slack history, README files, or issue trackers.
+## 5. Verify With A Test User
 
-## 6. Verify With A Test User
+Ask one user to export the PAT in their shell:
 
-Ask one user to register the MCP server with:
+```bash
+export METATATE_CORTEX_PAT='<snowflake-pat-secret>'
+```
+
+Then register the MCP server:
 
 ```bash
 ./bin/metatate-cortex-mcp-add \
   --account-url https://<account-url> \
-  --client-id <snowflake-oauth-client-id> \
   --snowflake-role METATATE_CORTEX_USER \
   --write
 ```
@@ -145,17 +121,26 @@ cortex mcp start
 
 Successful setup means:
 
-- Snowflake login completes.
+- Cortex Code connects without opening an OAuth browser flow.
 - Cortex Code shows the `metatate` MCP server as connected.
 - Cortex Code can call the Metatate tools.
 
+## OAuth Fallback
+
+OAuth is not the recommended Cortex Code path for Snowflake-managed Metatate
+MCP today. In tested Cortex Code builds, Snowflake-managed MCP resource
+metadata advertises `session:role:all`, and Cortex Code follows that metadata
+even when `mcp.json` contains `scope: session:role:<ROLE>`. That causes the
+Snowflake authorization page to request role `ALL`, which many Snowflake OAuth
+integrations correctly block.
+
+Keep OAuth for clients where you have verified the managed MCP resource
+metadata and client behavior request the intended role-specific scope.
+
 ## Operational Notes
 
-- Keep the OAuth redirect port and Snowflake redirect URI aligned.
-- If changing the Cortex Code role, update both the Snowflake OAuth integration
-  and the Cortex MCP registration.
-- If users see a role-blocked error, confirm the MCP config contains
-  `session:role:<role>` and that the same role is in `ALLOWED_ROLES_LIST` and
-  `PRE_AUTHORIZED_ROLES_LIST`.
-- For Claude Code, continue using the Claude plugin's confidential OAuth setup.
-  This Cortex Code plugin uses a separate local CLI OAuth profile.
+- Rotate PATs on a defined schedule.
+- Use role-restricted PATs only; do not use an unrestricted PAT for MCP access.
+- Keep the `X-Snowflake-Role` header aligned with the PAT `ROLE_RESTRICTION`.
+- If changing the Cortex Code role, issue a new PAT restricted to that role and
+  update the local MCP registration.
