@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 680" width="820" height="680" role="img" aria-labelledby="title desc" font-family="'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace">
+  <title id="title">Cortex Code &#183; Metatate validate-query-context demo</title>
+  <desc id="desc">An animated terminal session showing the Metatate plugin for Cortex Code validating a SQL query for an AI/ML training run. The verdict comes back NOT COMPLIANT due to an AI governance restriction, and Metatate suggests a safer rewrite using a PII-stripped feature view.</desc>
+
+  <!-- Background -->
+  <rect width="820" height="680" fill="#0a0a18"/>
+
+  <!-- Chrome bar -->
+  <rect width="820" height="44" fill="#19192C"/>
+  <circle cx="22" cy="22" r="6" fill="#F5139E"/>
+  <circle cx="42" cy="22" r="6" fill="#ADADD4"/>
+  <circle cx="62" cy="22" r="6" fill="#C3FFB2"/>
+  <text x="84" y="27" fill="rgba(255,255,255,0.62)" font-size="13">cortex code</text>
+
+  <!-- Live indicator (pulses) -->
+  <circle cx="758" cy="22" r="3.5" fill="#C3FFB2">
+    <animate attributeName="opacity" values="1;0.35;1" dur="1.6s" repeatCount="indefinite"/>
+  </circle>
+  <text x="770" y="26" fill="rgba(255,255,255,0.55)" font-size="10.5" letter-spacing="1.5" font-weight="700">LIVE</text>
+
+  <!-- Beat 1: comment (t=0) -->
+  <g>
+    <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.021;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="22" y="80" fill="rgba(255,255,255,0.4)" font-size="14"># Building the churn model training set</text>
+  </g>
+
+  <!-- Beat 2: command (t=0.6) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.05;0.071;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="22" y="106" fill="#29B5E8" font-size="14">&gt; /metatate:validate-query-context</text>
+  </g>
+
+  <!-- Beat 3: SQL line 1 (t=1.1) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.092;0.113;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="38" y="134" fill="rgba(255,255,255,0.88)" font-size="14"><tspan fill="#C3FFB2">SELECT</tspan> customer_id, account_email, lifetime_value,</text>
+  </g>
+
+  <!-- Beat 4: SQL line 2 (t=1.5) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.125;0.146;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="64" y="158" fill="rgba(255,255,255,0.88)" font-size="14">plan_tier, churn_score, last_active_at</text>
+  </g>
+
+  <!-- Beat 5: SQL line 3 (t=1.9) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.158;0.179;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="38" y="182" fill="rgba(255,255,255,0.88)" font-size="14"><tspan fill="#C3FFB2">FROM</tspan> prod.analytics.customer_360</text>
+  </g>
+
+  <!-- Beat 6: SQL line 4 (t=2.3) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.192;0.213;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="38" y="206" fill="rgba(255,255,255,0.88)" font-size="14"><tspan fill="#C3FFB2">WHERE</tspan> plan_tier <tspan fill="#C3FFB2">IN</tspan> (<tspan fill="#ADADD4">'enterprise'</tspan>, <tspan fill="#ADADD4">'business'</tspan>)</text>
+  </g>
+
+  <!-- Beat 7: thinking pill (t=3.0) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.25;0.271;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <!-- Animated dots -->
+    <circle cx="40" cy="238" r="2" fill="#ADADD4">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite" begin="3s"/>
+    </circle>
+    <circle cx="48" cy="238" r="2" fill="#ADADD4">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite" begin="3.2s"/>
+    </circle>
+    <circle cx="56" cy="238" r="2" fill="#ADADD4">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite" begin="3.4s"/>
+    </circle>
+    <text x="68" y="242" fill="rgba(255,255,255,0.55)" font-size="13" font-style="italic">validating against decision layer</text>
+  </g>
+
+  <!-- Beat 8: verdict (t=3.8) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.317;0.338;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="38" y="276" font-size="14"><tspan fill="#ADADD4">&#8594;</tspan> <tspan fill="#F5139E" font-weight="700" letter-spacing="0.5">NOT COMPLIANT</tspan> <tspan fill="#F5139E">&#10007;</tspan></text>
+    <text x="38" y="300" font-size="14"><tspan fill="#ADADD4">&#8594;</tspan> <tspan fill="rgba(255,255,255,0.55)">validation_id:</tspan> <tspan fill="#29B5E8">6b001c41</tspan></text>
+  </g>
+
+  <!-- Beat 9: blocking finding (t=4.6) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.383;0.404;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <!-- Tinted background -->
+    <rect x="22" y="320" width="776" height="72" fill="#F5139E" fill-opacity="0.08"/>
+    <!-- Left bar -->
+    <rect x="22" y="320" width="3" height="72" fill="#F5139E"/>
+    <!-- Header -->
+    <text x="40" y="342" font-size="11" letter-spacing="2" font-weight="700"><tspan fill="#F5139E">BLOCKING</tspan> <tspan fill="rgba(255,255,255,0.35)" letter-spacing="0">&#183;</tspan> <tspan fill="#F5139E" font-size="13" letter-spacing="0">AI_GOVERNANCE_RESTRICTED</tspan></text>
+    <!-- Message lines -->
+    <text x="40" y="365" fill="rgba(255,255,255,0.72)" font-size="13"><tspan fill="#ADADD4">prod.analytics.customer_360</tspan> is restricted for AI/ML pipelines.</text>
+    <text x="40" y="383" fill="rgba(255,255,255,0.72)" font-size="13">Authorization required before training-set use.</text>
+  </g>
+
+  <!-- Beat 10: warnings (t=5.8) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.483;0.504;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <text x="22" y="420" font-size="11" letter-spacing="2" font-weight="700"><tspan fill="rgba(255,255,255,0.45)">WARNINGS</tspan> <tspan fill="rgba(255,255,255,0.3)" letter-spacing="0">&#183;</tspan> <tspan fill="rgba(255,255,255,0.55)" letter-spacing="0" font-size="13">4 findings</tspan></text>
+    <text x="38" y="444" font-size="13"><tspan fill="#ADADD4">SELECT_STAR_PII</tspan> <tspan fill="rgba(255,255,255,0.3)">&#183;</tspan> <tspan fill="rgba(255,255,255,0.72)">account_email, customer_id</tspan></text>
+    <text x="38" y="464" font-size="13"><tspan fill="#ADADD4">FINANCIAL_SENSITIVITY</tspan> <tspan fill="rgba(255,255,255,0.3)">&#183;</tspan> <tspan fill="rgba(255,255,255,0.72)">lifetime_value</tspan></text>
+  </g>
+
+  <!-- Beat 11: suggested rewrite (t=6.8) -->
+  <g>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.567;0.588;0.9;0.917;1" dur="12s" repeatCount="indefinite"/>
+    <!-- Tinted background -->
+    <rect x="22" y="486" width="776" height="158" fill="#C3FFB2" fill-opacity="0.07"/>
+    <!-- Left bar -->
+    <rect x="22" y="486" width="3" height="158" fill="#C3FFB2"/>
+    <!-- Header -->
+    <text x="40" y="510" fill="#C3FFB2" font-size="11" letter-spacing="2" font-weight="700">SUGGESTED REWRITE</text>
+    <!-- SQL rewrite lines -->
+    <text x="40" y="538" fill="rgba(255,255,255,0.88)" font-size="14"><tspan fill="#C3FFB2">SELECT</tspan> customer_hash, plan_tier, lifetime_value,</text>
+    <text x="66" y="562" fill="rgba(255,255,255,0.88)" font-size="14">churn_score, last_active_at</text>
+    <text x="40" y="586" fill="rgba(255,255,255,0.88)" font-size="14"><tspan fill="#C3FFB2">FROM</tspan> prod.analytics.customer_360_ml_features</text>
+    <text x="40" y="610" fill="rgba(255,255,255,0.88)" font-size="14"><tspan fill="#C3FFB2">WHERE</tspan> plan_tier <tspan fill="#C3FFB2">IN</tspan> (<tspan fill="#ADADD4">'enterprise'</tspan>, <tspan fill="#ADADD4">'business'</tspan>)</text>
+  </g>
+</svg>
